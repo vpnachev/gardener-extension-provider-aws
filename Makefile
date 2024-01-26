@@ -88,7 +88,10 @@ start-admission:
 
 .PHONY: hook-me
 hook-me: $(KUBECTL)
-	bash $(GARDENER_HACK_DIR)/hook-me.sh $(EXTENSION_NAMESPACE) $$(kubectl get namespace -o custom-columns=NAME:.metadata.name | grep $(NAME) | head -n1) $(WEBHOOK_CONFIG_PORT)
+	bash $(REPO_ROOT)/hack/hook-me.sh \
+		$(EXTENSION_PREFIX)-$(NAME) \
+		$$(kubectl get namespace -l controllerregistration.core.gardener.cloud/name=$(NAME) -o jsonpath="{.items[0].metadata.name}" ) \
+		$(WEBHOOK_CONFIG_PORT)
 
 #################################################################
 # Rules related to binary build, Docker image build and release #
@@ -135,7 +138,7 @@ check-generate:
 	@bash $(GARDENER_HACK_DIR)/check-generate.sh $(REPO_ROOT)
 
 .PHONY: check
-check: $(GOIMPORTS) $(GOLANGCI_LINT) 
+check: $(GOIMPORTS) $(GOLANGCI_LINT)
 	@REPO_ROOT=$(REPO_ROOT) bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... ./test/...
 	@REPO_ROOT=$(REPO_ROOT) bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
 
@@ -143,7 +146,7 @@ check: $(GOIMPORTS) $(GOLANGCI_LINT)
 generate: $(VGOPATH) $(CONTROLLER_GEN) $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ)
 	@REPO_ROOT=$(REPO_ROOT) VGOPATH=$(VGOPATH) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./example/... ./pkg/...
 	$(MAKE) format
-	
+
 .PHONY: format
 format: $(GOIMPORTS) $(GOIMPORTSREVISER)
 	@bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
