@@ -18,6 +18,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -165,15 +166,15 @@ type Interface interface {
 // Factory creates instances of Interface.
 type Factory interface {
 	// NewClient creates a new instance of Interface for the given AWS credentials and region.
-	NewClient(accessKeyID, secretAccessKey, region string) (Interface, error)
+	NewClient(*aws.Credentials) (Interface, error)
 }
 
 // FactoryFunc is a function that implements Factory.
-type FactoryFunc func(accessKeyID, secretAccessKey, region string) (Interface, error)
+type FactoryFunc func(*aws.Credentials) (Interface, error)
 
 // NewClient creates a new instance of Interface for the given AWS credentials and region.
-func (f FactoryFunc) NewClient(accessKeyID, secretAccessKey, region string) (Interface, error) {
-	return f(accessKeyID, secretAccessKey, region)
+func (f FactoryFunc) NewClient(c *aws.Credentials) (Interface, error) {
+	return f(c)
 }
 
 // DhcpOptions contains the relevant fields of a EC2 DHCP options resource.

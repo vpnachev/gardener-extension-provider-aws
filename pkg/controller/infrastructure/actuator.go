@@ -76,7 +76,38 @@ func newTerraformer(
 		SetOwnerRef(owner), nil
 }
 
-func generateTerraformerEnvVars(secretRef corev1.SecretReference) []corev1.EnvVar {
+func generateTerraformerEnvVars(secretRef corev1.SecretReference, secret *corev1.Secret) []corev1.EnvVar { // TODO(vpnachev): Inject env vars
+	if arn, ok := secret.Data[aws.ARNKey]; ok && len(arn) != 0 {
+		return []corev1.EnvVar{
+			{
+				Name: "AWS_REGION",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretRef.Name,
+						},
+						Key: "region",
+					},
+				},
+			},
+			{
+				Name: "AWS_ROLE_ARN",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretRef.Name,
+						},
+						Key: aws.ARNKey,
+					},
+				},
+			},
+			{
+				Name:  "AWS_WEB_IDENTITY_TOKEN_FILE",
+				Value: "", //TODO
+			},
+		}
+	}
+
 	return []corev1.EnvVar{{
 		Name: "TF_VAR_ACCESS_KEY_ID",
 		ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{

@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
-	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
+	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 )
 
 type actuator struct {
@@ -40,7 +40,7 @@ func newActuator(mgr manager.Manager) backupbucket.Actuator {
 }
 
 func (a *actuator) Reconcile(ctx context.Context, _ logr.Logger, bb *extensionsv1alpha1.BackupBucket) error {
-	awsClient, err := aws.NewClientFromSecretRef(ctx, a.client, bb.Spec.SecretRef, bb.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, a.client, bb.Spec.SecretRef, bb.Spec.Region)
 	if err != nil {
 		return util.DetermineError(err, helper.KnownCodes)
 	}
@@ -49,7 +49,7 @@ func (a *actuator) Reconcile(ctx context.Context, _ logr.Logger, bb *extensionsv
 }
 
 func (a *actuator) Delete(ctx context.Context, _ logr.Logger, bb *extensionsv1alpha1.BackupBucket) error {
-	awsClient, err := aws.NewClientFromSecretRef(ctx, a.client, bb.Spec.SecretRef, bb.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, a.client, bb.Spec.SecretRef, bb.Spec.Region)
 	if err != nil {
 		return util.DetermineError(err, helper.KnownCodes)
 	}

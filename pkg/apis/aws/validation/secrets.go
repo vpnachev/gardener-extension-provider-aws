@@ -38,6 +38,37 @@ var (
 func ValidateCloudProviderSecret(secret *corev1.Secret) error {
 	secretRef := fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
 
+	if _, ok := secret.Data[aws.ARNKey]; ok {
+		return validateWebToken(secret, secretRef)
+	}
+
+	return validateStaticCredentials(secret, secretRef)
+}
+
+func validateWebToken(secret *corev1.Secret, secretRef string) error {
+
+	arn, ok := secret.Data[aws.ARNKey]
+	if !ok {
+		return fmt.Errorf("missing %q field in secret %s", aws.ARNKey, secretRef)
+	}
+
+	if len(arn) == 0 {
+		return fmt.Errorf("field %q in secret %s must not have empty value", aws.ARNKey, secretRef)
+	}
+
+	token, ok := secret.Data[aws.WebTokenKey]
+	if !ok {
+		return fmt.Errorf("missing %q field in secret %s", aws.WebTokenKey, secretRef)
+	}
+
+	if len(token) == 0 {
+		return fmt.Errorf("field %q in secret %s must not have empty value", aws.WebTokenKey, secretRef)
+	}
+
+	return nil
+}
+
+func validateStaticCredentials(secret *corev1.Secret, secretRef string) error {
 	// accessKeyID must have length between 16 and 128 and only contain alphanumeric characters,
 	// see https://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html
 	accessKeyID, ok := secret.Data[aws.AccessKeyID]

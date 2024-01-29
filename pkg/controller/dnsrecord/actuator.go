@@ -64,7 +64,8 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, dns *extensio
 	if err != nil {
 		return util.DetermineError(fmt.Errorf("could not get AWS credentials: %+v", err), helper.KnownCodes)
 	}
-	awsClient, err := a.awsClientFactory.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), getRegion(dns, credentials))
+	credentials.Region = []byte(getRegion(dns, credentials))
+	awsClient, err := a.awsClientFactory.NewClient(credentials)
 	if err != nil {
 		return util.DetermineError(fmt.Errorf("could not create AWS client: %+v", err), helper.KnownCodes)
 	}
@@ -104,7 +105,8 @@ func (a *actuator) Delete(ctx context.Context, log logr.Logger, dns *extensionsv
 	if err != nil {
 		return fmt.Errorf("could not get AWS credentials: %+v", err)
 	}
-	awsClient, err := a.awsClientFactory.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), getRegion(dns, credentials))
+	credentials.Region = []byte(getRegion(dns, credentials))
+	awsClient, err := a.awsClientFactory.NewClient(credentials)
 	if err != nil {
 		return util.DetermineError(fmt.Errorf("could not create AWS client: %+v", err), helper.KnownCodes)
 	}

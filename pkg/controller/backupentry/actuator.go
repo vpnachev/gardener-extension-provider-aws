@@ -27,6 +27,7 @@ import (
 
 	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
+	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 )
 
 type actuator struct {
@@ -45,7 +46,7 @@ func (a *actuator) GetETCDSecretData(_ context.Context, _ logr.Logger, be *exten
 }
 
 func (a *actuator) Delete(ctx context.Context, _ logr.Logger, be *extensionsv1alpha1.BackupEntry) error {
-	awsClient, err := aws.NewClientFromSecretRef(ctx, a.client, be.Spec.SecretRef, be.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, a.client, be.Spec.SecretRef, be.Spec.Region)
 	if err != nil {
 		return util.DetermineError(err, helper.KnownCodes)
 	}

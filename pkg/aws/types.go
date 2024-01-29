@@ -65,6 +65,10 @@ const (
 	SecretAccessKey = "secretAccessKey"
 	// SharedCredentialsFile is a constant for the key in cloud provider secret that holds the AWS credentials file.
 	SharedCredentialsFile = "credentialsFile"
+	// WebTokenKey is a constant for the key in a cloud provider secret that holds the OIDC token used for identity federation.
+	WebTokenKey = "token"
+	// ARNKey is a constant for the key in a cloud provider secret that holds the AWS ARN.
+	ARNKey = "arn"
 	// Region is a constant for the key in a backup secret that holds the AWS region.
 	Region = "region"
 	// DNSAccessKeyID is a constant for the key in a DNS secret that holds the AWS access key id.
@@ -145,4 +149,9 @@ type Credentials struct {
 	AccessKeyID     []byte
 	SecretAccessKey []byte
 	Region          []byte
+
+	ARN         string
+	Token       []byte
+	TokenFile   string
+	SessionName string
 }

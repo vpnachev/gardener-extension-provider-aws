@@ -39,7 +39,20 @@ type ensurer struct {
 
 // EnsureCloudProviderSecret ensures that cloudprovider secret contains
 // the shared credentials file.
-func (e *ensurer) EnsureCloudProviderSecret(_ context.Context, _ gcontext.GardenContext, new, _ *corev1.Secret) error {
+func (e *ensurer) EnsureCloudProviderSecret(ctx context.Context, g gcontext.GardenContext, new, _ *corev1.Secret) error {
+	if arn, ok := new.Data[aws.ARNKey]; ok && len(arn) != 0 {
+		if token, ok := new.Data[aws.WebTokenKey]; !ok || len(token) == 0 {
+			return fmt.Errorf("using web identity authentication without token is not allowed")
+		}
+		cluster, err := g.GetCluster(ctx)
+		if err != nil {
+			return err
+		}
+
+		new.Data["region"] = []byte(cluster.Shoot.Spec.Region)
+		return nil
+	}
+
 	if _, ok := new.Data[aws.AccessKeyID]; !ok {
 		return fmt.Errorf("could not mutate cloudprovider secret as %q field is missing", aws.AccessKeyID)
 	}

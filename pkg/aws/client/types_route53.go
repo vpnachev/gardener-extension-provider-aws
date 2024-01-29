@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/util/cache"
 )
@@ -58,12 +59,12 @@ type route53Factory struct {
 }
 
 // NewClient creates a new instance of Interface for the given AWS credentials and region.
-func (f *route53Factory) NewClient(accessKeyID, secretAccessKey, region string) (Interface, error) {
-	c, err := NewClient(accessKeyID, secretAccessKey, region)
+func (f *route53Factory) NewClient(creds *aws.Credentials) (Interface, error) {
+	c, err := NewClient(creds)
 	if err != nil {
 		return nil, err
 	}
-	c.Route53RateLimiter = f.getRateLimiter(accessKeyID)
+	c.Route53RateLimiter = f.getRateLimiter(string(creds.AccessKeyID))
 	c.Route53RateLimiterWaitTimeout = f.waitTimeout
 	return c, nil
 }

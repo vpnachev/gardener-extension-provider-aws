@@ -26,6 +26,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/util"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -38,6 +39,7 @@ import (
 	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/controller/infrastructure/infraflow"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/controller/infrastructure/infraflow/shared"
+	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
 )
 
 func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, infrastructure *extensionsv1alpha1.Infrastructure, cluster *extensionscontroller.Cluster) error {
@@ -137,7 +139,7 @@ func (a *actuator) createFlowContext(ctx context.Context, log logr.Logger,
 		return nil, err
 	}
 
-	awsClient, err := aws.NewClientFromSecretRef(ctx, a.client, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, a.client, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new AWS client: %w", err)
 	}
@@ -217,7 +219,7 @@ func (a *actuator) updateStatusState(ctx context.Context, infra *extensionsv1alp
 }
 
 func (a *actuator) computeEgressCIDRs(ctx context.Context, infra *extensionsv1alpha1.Infrastructure) ([]string, error) {
-	awsClient, err := aws.NewClientFromSecretRef(ctx, a.client, infra.Spec.SecretRef, infra.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, a.client, infra.Spec.SecretRef, infra.Spec.Region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new AWS client: %w", err)
 	}
@@ -344,7 +346,7 @@ func ReconcileWithTerraformer(
 		return nil, nil, fmt.Errorf("could not decode provider config: %+v", err)
 	}
 
-	awsClient, err := aws.NewClientFromSecretRef(ctx, c, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, c, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
 	if err != nil {
 		return nil, nil, util.DetermineError(fmt.Errorf("failed to create new AWS client: %+v", err), helper.KnownCodes)
 	}
@@ -364,8 +366,16 @@ func ReconcileWithTerraformer(
 		return nil, nil, util.DetermineError(fmt.Errorf("could not create terraformer object: %+v", err), helper.KnownCodes)
 	}
 
+	var (
+		secret    = &corev1.Secret{}
+		secretKey = kutil.Key(infrastructure.Spec.SecretRef.Namespace, infrastructure.Spec.SecretRef.Name)
+	)
+	if err := c.Get(ctx, secretKey, secret); err != nil {
+		return nil, nil, err
+	}
+
 	if err := tf.
-		SetEnvVars(generateTerraformerEnvVars(infrastructure.Spec.SecretRef)...).
+		SetEnvVars(generateTerraformerEnvVars(infrastructure.Spec.SecretRef, secret)...).
 		InitializeWith(
 			ctx,
 			terraformer.DefaultInitializer(

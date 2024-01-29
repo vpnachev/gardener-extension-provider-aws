@@ -47,6 +47,7 @@ import (
 	controlplanewebhook "github.com/gardener/gardener-extension-provider-aws/pkg/webhook/controlplane"
 	controlplaneexposurewebhook "github.com/gardener/gardener-extension-provider-aws/pkg/webhook/controlplaneexposure"
 	shootwebhook "github.com/gardener/gardener-extension-provider-aws/pkg/webhook/shoot"
+	terraformerwebhook "github.com/gardener/gardener-extension-provider-aws/pkg/webhook/terraformer"
 )
 
 const (
@@ -80,6 +81,7 @@ func WebhookSwitchOptions() *webhookcmd.SwitchOptions {
 		webhookcmd.Switch(extensioncontrolplanewebhook.ExposureWebhookName, controlplaneexposurewebhook.AddToManager),
 		webhookcmd.Switch(extensionshootwebhook.WebhookName, shootwebhook.AddToManager),
 		webhookcmd.Switch(extensionscloudproviderwebhook.WebhookName, cloudproviderwebhook.AddToManager),
+		webhookcmd.Switch(terraformerwebhook.WebhookName, terraformerwebhook.AddToManager),
 	)
 }
 

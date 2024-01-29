@@ -23,9 +23,12 @@ import (
 	"strings"
 	"time"
 
+	gardeneraws "github.com/gardener/gardener-extension-provider-aws/pkg/aws"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
@@ -43,9 +46,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -74,22 +79,78 @@ type Client struct {
 var _ Interface = &Client{}
 
 // NewInterface creates a new instance of Interface for the given AWS credentials and region.
-func NewInterface(accessKeyID, secretAccessKey, region string) (Interface, error) {
-	return NewClient(accessKeyID, secretAccessKey, region)
+func NewInterface(c *gardeneraws.Credentials) (Interface, error) {
+	return NewClient(c)
 }
 
 // NewClient creates a new Client for the given AWS credentials <accessKeyID>, <secretAccessKey>, and
 // the AWS region <region>.
 // It initializes the clients for the various services like EC2, ELB, etc.
-func NewClient(accessKeyID, secretAccessKey, region string) (*Client, error) {
+func NewClient(c *gardeneraws.Credentials) (*Client, error) {
+	if c.ARN != "" {
+		return newWebClient(c)
+	}
+	return newStaticClient(c)
+}
+
+// NewClientFromSecretRef creates a new Client for the given AWS credentials from given k8s <secretRef> and
+// the AWS region <region>.
+func NewClientFromSecretRef(ctx context.Context, client client.Client, secretRef corev1.SecretReference, region string) (Interface, error) {
+	credentials, err := gardeneraws.GetCredentialsFromSecretRef(ctx, client, secretRef, false)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(credentials)
+}
+
+func newStaticClient(c *gardeneraws.Credentials) (*Client, error) {
 	var (
 		awsConfig = &aws.Config{
-			Credentials: credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+			Credentials: credentials.NewStaticCredentials(string(c.AccessKeyID), string(c.SecretAccessKey), ""),
 		}
-		config = &aws.Config{Region: aws.String(region)}
+		config = &aws.Config{Region: aws.String(string(c.Region))}
 	)
 
 	s, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		EC2:                           ec2.New(s, config),
+		ELB:                           elb.New(s, config),
+		ELBv2:                         elbv2.New(s, config),
+		IAM:                           iam.New(s, config),
+		STS:                           sts.New(s, config),
+		S3:                            s3.New(s, config),
+		Route53:                       route53.New(s, config),
+		Route53RateLimiter:            rate.NewLimiter(rate.Inf, 0),
+		Route53RateLimiterWaitTimeout: 1 * time.Second,
+		Logger:                        log.Log.WithName("aws-client"),
+		PollInterval:                  5 * time.Second,
+	}, nil
+
+}
+
+func newWebClient(c *gardeneraws.Credentials) (*Client, error) {
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	webIDProvider := stscreds.NewWebIdentityRoleProviderWithOptions(sts.New(sess), c.ARN, c.SessionName, stscreds.FetchTokenPath(c.TokenFile))
+	creds, err := webIDProvider.Retrieve()
+	if err != nil {
+		return nil, err
+	}
+
+	cc := credentials.NewStaticCredentialsFromCreds(creds)
+	config := &aws.Config{
+		Credentials: cc,
+		Region:      aws.String(string(c.Region)),
+	}
+
+	s, err := session.NewSession(config)
 	if err != nil {
 		return nil, err
 	}

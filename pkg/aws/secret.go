@@ -17,13 +17,13 @@ package aws
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 )
 
 // GetCredentialsFromSecretRef reads the secret given by the the secret reference and returns the read Credentials
@@ -42,6 +42,46 @@ func ReadCredentialsSecret(secret *corev1.Secret, allowDNSKeys bool) (*Credentia
 		return nil, fmt.Errorf("secret does not contain any data")
 	}
 
+	if _, ok := secret.Data[ARNKey]; ok {
+		return readWebTokenCredentials(secret)
+	}
+	return readStaticCredentials(secret, allowDNSKeys)
+}
+
+func readWebTokenCredentials(secret *corev1.Secret) (*Credentials, error) {
+	token, err := getSecretDataValue(secret, WebTokenKey, nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	arn, err := getSecretDataValue(secret, ARNKey, nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	region, err := getSecretDataValue(secret, Region, nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenFile := filepath.Join(os.TempDir(), secret.GetNamespace(), "token")
+	if err := os.MkdirAll(filepath.Dir(tokenFile), 0700); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(tokenFile, token, os.ModeAppend); err != nil {
+		return nil, err
+	}
+
+	return &Credentials{
+		Token:       token,
+		TokenFile:   tokenFile,
+		ARN:         string(arn),
+		Region:      region,
+		SessionName: secret.GetNamespace(),
+	}, nil
+}
+
+func readStaticCredentials(secret *corev1.Secret, allowDNSKeys bool) (*Credentials, error) {
 	var altAccessKeyIDKey, altSecretAccessKeyKey, altRegionKey *string
 	if allowDNSKeys {
 		altAccessKeyIDKey, altSecretAccessKeyKey, altRegionKey = pointer.String(DNSAccessKeyID), pointer.String(DNSSecretAccessKey), pointer.String(DNSRegion)
@@ -64,16 +104,6 @@ func ReadCredentialsSecret(secret *corev1.Secret, allowDNSKeys bool) (*Credentia
 		SecretAccessKey: secretAccessKey,
 		Region:          region,
 	}, nil
-}
-
-// NewClientFromSecretRef creates a new Client for the given AWS credentials from given k8s <secretRef> and
-// the AWS region <region>.
-func NewClientFromSecretRef(ctx context.Context, client client.Client, secretRef corev1.SecretReference, region string) (awsclient.Interface, error) {
-	credentials, err := GetCredentialsFromSecretRef(ctx, client, secretRef, false)
-	if err != nil {
-		return nil, err
-	}
-	return awsclient.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), region)
 }
 
 func getSecretDataValue(secret *corev1.Secret, key string, altKey *string, required bool) ([]byte, error) {

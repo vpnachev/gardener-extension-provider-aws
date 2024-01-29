@@ -66,7 +66,8 @@ func (c *configValidator) Validate(ctx context.Context, infra *extensionsv1alpha
 		allErrs = append(allErrs, field.InternalError(nil, fmt.Errorf("could not get AWS credentials: %+v", err)))
 		return allErrs
 	}
-	awsClient, err := c.awsClientFactory.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), infra.Spec.Region)
+	credentials.Region = []byte(infra.Spec.Region)
+	awsClient, err := c.awsClientFactory.NewClient(credentials)
 	if err != nil {
 		allErrs = append(allErrs, field.InternalError(nil, fmt.Errorf("could not create AWS client: %+v", err)))
 		return allErrs

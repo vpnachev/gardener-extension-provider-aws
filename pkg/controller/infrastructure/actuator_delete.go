@@ -24,7 +24,9 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/util"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/utils/flow"
+	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -33,6 +35,7 @@ import (
 	awsapi "github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
+	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/controller/infrastructure/infraflow"
 )
 
@@ -108,9 +111,17 @@ func Delete(
 		return fmt.Errorf("error while checking whether terraform config exists: %+v", err)
 	}
 
-	awsClient, err := aws.NewClientFromSecretRef(ctx, c, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
+	awsClient, err := awsclient.NewClientFromSecretRef(ctx, c, infrastructure.Spec.SecretRef, infrastructure.Spec.Region)
 	if err != nil {
 		return util.DetermineError(fmt.Errorf("failed to create new AWS client: %+v", err), helper.KnownCodes)
+	}
+
+	var (
+		secret    = &corev1.Secret{}
+		secretKey = kutil.Key(infrastructure.Spec.SecretRef.Namespace, infrastructure.Spec.SecretRef.Name)
+	)
+	if err := c.Get(ctx, secretKey, secret); err != nil {
+		return err
 	}
 
 	var (
@@ -148,7 +159,7 @@ func Delete(
 
 		_ = g.Add(flow.Task{
 			Name:         "Destroying Shoot infrastructure",
-			Fn:           tf.SetEnvVars(generateTerraformerEnvVars(infrastructure.Spec.SecretRef)...).Destroy,
+			Fn:           tf.SetEnvVars(generateTerraformerEnvVars(infrastructure.Spec.SecretRef, secret)...).Destroy,
 			Dependencies: flow.NewTaskIDs(destroyLoadBalancersAndSecurityGroups),
 		})
 
