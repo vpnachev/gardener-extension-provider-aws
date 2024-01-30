@@ -101,10 +101,6 @@ func generateTerraformerEnvVars(secretRef corev1.SecretReference, secret *corev1
 					},
 				},
 			},
-			{
-				Name:  "AWS_WEB_IDENTITY_TOKEN_FILE",
-				Value: "", //TODO
-			},
 		}
 	}
 

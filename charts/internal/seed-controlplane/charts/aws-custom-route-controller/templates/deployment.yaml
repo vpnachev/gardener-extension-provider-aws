@@ -42,6 +42,21 @@ spec:
       - name: aws-custom-route-controller
         image: {{ index .Values.images "aws-custom-route-controller" }}
         imagePullPolicy: IfNotPresent
+        {{- if .Values.useWebIdentity }}
+        env:
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: region
+        - name: AWS_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: arn
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: /srv/cloudprovider/token
+        {{- end }}
         command:
         - /aws-custom-route-controller
         - --control-kubeconfig=inClusterConfig
@@ -83,6 +98,10 @@ spec:
         - mountPath: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig
           name: kubeconfig
           readOnly: true
+        {{- if .Values.useWebIdentity }}
+        - name: cloudprovider
+          mountPath: /srv/cloudprovider
+        {{- end }}
       volumes:
       - name: kubeconfig
         projected:
@@ -100,3 +119,8 @@ spec:
                 path: token
               name: shoot-access-aws-custom-route-controller
               optional: false
+      {{- if .Values.useWebIdentity }}
+      - name: cloudprovider
+        secret:
+        secretName: cloudprovider
+      {{- end }}

@@ -4,6 +4,7 @@
 
 replicaCount: 2
 
+useWebIdentity: false
 images:
   aws-load-balancer-controller: image-repository:image-tag
 

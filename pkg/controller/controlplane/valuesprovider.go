@@ -381,7 +381,19 @@ func (vp *valuesProvider) GetControlPlaneChartValues(
 		return nil, fmt.Errorf("failed deleting legacy csi-snapshot-validation network policy: %w", err)
 	}
 
-	return getControlPlaneChartValues(cpConfig, cp, infraStatus, cluster, secretsReader, checksums, scaledDown)
+	var (
+		secretKey      = kutil.Key(cp.GetNamespace(), v1beta1constants.SecretNameCloudProvider)
+		secret         = &corev1.Secret{}
+		useWebIdentity = false
+	)
+	if err := vp.client.Get(ctx, secretKey, secret); err != nil {
+		return nil, err
+	}
+
+	arn, ok := secret.Data[aws.ARNKey]
+	useWebIdentity = ok && len(arn) != 0
+
+	return getControlPlaneChartValues(cpConfig, cp, infraStatus, cluster, secretsReader, checksums, scaledDown, useWebIdentity)
 }
 
 // GetControlPlaneShootChartValues returns the values for the control plane shoot chart applied by the generic actuator.
@@ -400,7 +412,7 @@ func (vp *valuesProvider) GetControlPlaneShootChartValues(
 		}
 	}
 
-	return getControlPlaneShootChartValues(cluster, cpConfig, cp, secretsReader)
+	return getControlPlaneShootChartValues(cluster, cpConfig, cp, secretsReader, false)
 }
 
 // GetControlPlaneShootCRDsChartValues returns the values for the control plane shoot CRDs chart applied by the generic actuator.
@@ -483,24 +495,25 @@ func getControlPlaneChartValues(
 	cluster *extensionscontroller.Cluster,
 	secretsReader secretsmanager.Reader,
 	checksums map[string]string,
-	scaledDown bool,
+	scaledDown,
+	useWebIdentity bool,
 ) (map[string]interface{}, error) {
-	ccm, err := getCCMChartValues(cpConfig, cp, cluster, secretsReader, checksums, scaledDown)
+	ccm, err := getCCMChartValues(cpConfig, cp, cluster, secretsReader, checksums, scaledDown, useWebIdentity)
 	if err != nil {
 		return nil, err
 	}
 
-	crc, err := getCRCChartValues(cpConfig, cp, cluster, checksums, scaledDown)
+	crc, err := getCRCChartValues(cpConfig, cp, cluster, checksums, scaledDown, useWebIdentity)
 	if err != nil {
 		return nil, err
 	}
 
-	alb, err := getALBChartValues(cpConfig, cp, cluster, secretsReader, checksums, scaledDown, infraStatus)
+	alb, err := getALBChartValues(cpConfig, cp, cluster, secretsReader, checksums, scaledDown, useWebIdentity, infraStatus)
 	if err != nil {
 		return nil, err
 	}
 
-	csi, err := getCSIControllerChartValues(cp, cluster, secretsReader, checksums, scaledDown)
+	csi, err := getCSIControllerChartValues(cp, cluster, secretsReader, checksums, scaledDown, useWebIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +536,8 @@ func getCCMChartValues(
 	cluster *extensionscontroller.Cluster,
 	secretsReader secretsmanager.Reader,
 	checksums map[string]string,
-	scaledDown bool,
+	scaledDown,
+	useWebIdentity bool,
 ) (map[string]interface{}, error) {
 	serverSecret, found := secretsReader.Get(cloudControllerManagerServerName)
 	if !found {
@@ -547,6 +561,7 @@ func getCCMChartValues(
 		"secrets": map[string]interface{}{
 			"server": serverSecret.Name,
 		},
+		"useWebIdentity": useWebIdentity,
 	}
 
 	if cpConfig.CloudControllerManager != nil {
@@ -562,7 +577,8 @@ func getCRCChartValues(
 	cp *extensionsv1alpha1.ControlPlane,
 	cluster *extensionscontroller.Cluster,
 	checksums map[string]string,
-	scaledDown bool,
+	scaledDown,
+	useWebIdentity bool,
 ) (map[string]interface{}, error) {
 	values := map[string]interface{}{
 		"enabled":     true,
@@ -575,7 +591,8 @@ func getCRCChartValues(
 		"podLabels": map[string]interface{}{
 			v1beta1constants.LabelPodMaintenanceRestart: "true",
 		},
-		"region": cp.Spec.Region,
+		"region":         cp.Spec.Region,
+		"useWebIdentity": useWebIdentity,
 	}
 	enabled := cpConfig.CloudControllerManager != nil &&
 		cpConfig.CloudControllerManager.UseCustomRouteController != nil &&
@@ -594,7 +611,8 @@ func getALBChartValues(
 	cluster *extensionscontroller.Cluster,
 	secretsReader secretsmanager.Reader,
 	checksums map[string]string,
-	scaledDown bool,
+	scaledDown,
+	useWebIdentity bool,
 	infraStatus *apisaws.InfrastructureStatus,
 ) (map[string]interface{}, error) {
 	shootChart := infraStatus == nil
@@ -627,6 +645,7 @@ func getALBChartValues(
 			"KubernetesCluster":                     cp.Namespace,
 			"kubernetes.io/cluster/" + cp.Namespace: "owned",
 		},
+		"useWebIdentity": useWebIdentity,
 	}
 	if cpConfig.LoadBalancerController != nil && cpConfig.LoadBalancerController.IngressClassName != nil {
 		values["ingressClass"] = *cpConfig.LoadBalancerController.IngressClassName
@@ -658,7 +677,8 @@ func getCSIControllerChartValues(
 	cluster *extensionscontroller.Cluster,
 	secretsReader secretsmanager.Reader,
 	checksums map[string]string,
-	scaledDown bool,
+	scaledDown,
+	useWebIdentity bool,
 ) (map[string]interface{}, error) {
 	serverSecret, found := secretsReader.Get(csiSnapshotValidationServerName)
 	if !found {
@@ -682,6 +702,7 @@ func getCSIControllerChartValues(
 			},
 			"topologyAwareRoutingEnabled": gardencorev1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
 		},
+		"useWebIdentity": useWebIdentity,
 	}, nil
 }
 
@@ -691,6 +712,7 @@ func getControlPlaneShootChartValues(
 	cpConfig *apisaws.ControlPlaneConfig,
 	cp *extensionsv1alpha1.ControlPlane,
 	secretsReader secretsmanager.Reader,
+	useWebIdentity bool,
 ) (map[string]interface{}, error) {
 	kubernetesVersion := cluster.Shoot.Spec.Kubernetes.Version
 
@@ -720,7 +742,7 @@ func getControlPlaneShootChartValues(
 		}
 	}
 
-	albValues, err := getALBChartValues(cpConfig, cp, cluster, secretsReader, nil, false, nil)
+	albValues, err := getALBChartValues(cpConfig, cp, cluster, secretsReader, nil, false, useWebIdentity, nil)
 	if err != nil {
 		return nil, err
 	}

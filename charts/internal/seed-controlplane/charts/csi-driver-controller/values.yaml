@@ -96,3 +96,5 @@ csiSnapshotValidationWebhook:
 
 volumeModifier:
   log: 2
+
+useWebIdentity: false

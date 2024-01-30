@@ -53,6 +53,15 @@ spec:
           value: /srv/cloudprovider/credentialsFile
         - name: AWS_REGION
           value: {{ .Values.region }}
+        {{- if .Values.useWebIdentity }}
+        - name: AWS_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: arn
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: /srv/cloudprovider/token
+        {{- end }}
 {{- if .Values.resources.driver }}
         resources:
 {{ toYaml .Values.resources.driver | indent 10 }}

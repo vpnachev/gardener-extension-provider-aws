@@ -174,6 +174,20 @@ spec:
         # start provider-aws-specific
         - name: AWS_SHARED_CREDENTIALS_FILE
           value: /srv/cloudprovider/credentialsFile
+        {{- if .Values.useWebIdentity }}
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: region
+        - name: AWS_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: arn
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: /srv/cloudprovider/token
+        {{- end }}
         # end provider-aws-specific
         {{- if .Values.env }}
         {{- range $key, $value := .Values.env }}

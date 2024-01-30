@@ -64,6 +64,20 @@ spec:
         env:
         - name: AWS_SHARED_CREDENTIALS_FILE
           value: /srv/cloudprovider/credentialsFile
+        {{- if .Values.useWebIdentity }}
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: region
+        - name: AWS_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: cloudprovider
+              key: arn
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: /srv/cloudprovider/token
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz

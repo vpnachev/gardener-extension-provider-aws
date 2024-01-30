@@ -1,6 +1,8 @@
 images:
   aws-custom-route-controller: image-repository:image-tag
 
+useWebIdentity: false
+
 replicas: 1
 
 podAnnotations: {}
