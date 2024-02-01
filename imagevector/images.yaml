@@ -98,8 +98,8 @@ images:
       availability_requirement: 'low'
 - name: machine-controller-manager-provider-aws
   sourceRepository: github.com/gardener/machine-controller-manager-provider-aws
-  repository: europe-docker.pkg.dev/gardener-project/releases/gardener/machine-controller-manager-provider-aws
-  tag: "v0.19.2"
+  repository: ghcr.io/vpnachev/gardener/machine-controller-manager-provider-aws
+  tag: "v0.19.2-dev-8836d55d15dec055236df9bc2a513f37a60cf4a7"
   labels:
   - name: 'gardener.cloud/cve-categorisation'
     value:
@@ -111,8 +111,8 @@ images:
       availability_requirement: 'low'
 - name: aws-custom-route-controller
   sourceRepository: github.com/gardener/aws-custom-route-controller
-  repository: europe-docker.pkg.dev/gardener-project/releases/gardener/aws-custom-route-controller
-  tag: "v0.8.0"
+  repository: ghcr.io/vpnachev/gardener/aws-custom-route-controller
+  tag: "v0.9.0-dev-cb8800841e2a2f8a2946642517996a9ac6e04613"
   labels:
   - name: 'gardener.cloud/cve-categorisation'
     value:

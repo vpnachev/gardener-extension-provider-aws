@@ -255,7 +255,7 @@ func ensureKubeControllerManagerLabels(t *corev1.PodTemplateSpec) {
 	delete(t.Labels, v1beta1constants.LabelNetworkPolicyToPrivateNetworks)
 }
 
-var ( // TODO(vpnachev): add token env vars
+var (
 	accessKeyIDEnvVar = corev1.EnvVar{
 		Name: "AWS_ACCESS_KEY_ID",
 		ValueFrom: &corev1.EnvVarSource{
