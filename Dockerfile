@@ -15,7 +15,7 @@ ARG EFFECTIVE_VERSION
 RUN make install EFFECTIVE_VERSION=$EFFECTIVE_VERSION
 
 ############# base
-FROM gcr.io/distroless/static-debian11:nonroot AS base
+FROM alpine:3.19 AS base
 
 ############# gardener-extension-provider-aws
 FROM base AS gardener-extension-provider-aws
